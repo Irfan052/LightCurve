@@ -1,0 +1,183 @@
+{
+  "schema_version": "phase_2e",
+  "generated_at": "2026-06-24T17:24:44.315998+00:00",
+  "feature_keys": [
+    "period",
+    "depth",
+    "duration",
+    "snr",
+    "shape_score",
+    "odd_even_diff",
+    "secondary_depth",
+    "secondary_ratio",
+    "out_transit_var",
+    "symmetry",
+    "odd_depth",
+    "even_depth",
+    "secondary_phase_flux",
+    "ingress_slope",
+    "egress_slope",
+    "transit_symmetry",
+    "u_shape_score",
+    "v_shape_score",
+    "out_of_transit_rms",
+    "depth_to_rms",
+    "transit_bottom_width",
+    "transit_full_width",
+    "in_transit_points",
+    "out_of_transit_points",
+    "folded_point_count",
+    "binned_transit_min_flux",
+    "binned_transit_depth",
+    "transit_centroid_offset"
+  ],
+  "legacy_feature_count": 10,
+  "morphology_feature_count": 18,
+  "morphology_features_included": true,
+  "morphology_feature_keys": [
+    "odd_depth",
+    "even_depth",
+    "secondary_phase_flux",
+    "ingress_slope",
+    "egress_slope",
+    "transit_symmetry",
+    "u_shape_score",
+    "v_shape_score",
+    "out_of_transit_rms",
+    "depth_to_rms",
+    "transit_bottom_width",
+    "transit_full_width",
+    "in_transit_points",
+    "out_of_transit_points",
+    "folded_point_count",
+    "binned_transit_min_flux",
+    "binned_transit_depth",
+    "transit_centroid_offset"
+  ],
+  "training_samples": 160,
+  "test_samples": 40,
+  "selection_criterion": "f1_score",
+  "selected_model": "random_forest",
+  "model_comparison": {
+    "random_forest": {
+      "accuracy": 0.975,
+      "precision": 0.9772727272727273,
+      "recall": 0.975,
+      "f1_score": 0.974937343358396
+    },
+    "xgboost": {
+      "accuracy": 0.975,
+      "precision": 0.9772727272727273,
+      "recall": 0.975,
+      "f1_score": 0.974937343358396
+    }
+  },
+  "feature_importance": {
+    "random_forest": {
+      "period": 0.0015880970191718925,
+      "depth": 0.0805702412100426,
+      "duration": 0.016563353049738855,
+      "snr": 0.051486895739127805,
+      "shape_score": 0.00042269506352308805,
+      "odd_even_diff": 0.002368516575895516,
+      "secondary_depth": 0.009359946399056606,
+      "secondary_ratio": 0.007964007352653651,
+      "out_transit_var": 0.14949835450595783,
+      "symmetry": 0.0003126417530269724,
+      "odd_depth": 0.0634156708704072,
+      "even_depth": 0.07543616952144515,
+      "secondary_phase_flux": 0.025360981776750804,
+      "ingress_slope": 0.00021187308947876376,
+      "egress_slope": 0.0022787787839165957,
+      "transit_symmetry": 0.00039293542974955394,
+      "u_shape_score": 0.0020614421814835623,
+      "v_shape_score": 0.0028864756685443808,
+      "out_of_transit_rms": 0.13418231724082108,
+      "depth_to_rms": 0.0874286626127293,
+      "transit_bottom_width": 0.00838844842688047,
+      "transit_full_width": 0.005934674321703728,
+      "in_transit_points": 0.005684476603541337,
+      "out_of_transit_points": 0.017324634106994592,
+      "folded_point_count": 0.11856131329799854,
+      "binned_transit_min_flux": 0.06938952392547346,
+      "binned_transit_depth": 0.060284263265820294,
+      "transit_centroid_offset": 0.0006426102080665425
+    },
+    "xgboost": {
+      "period": 0.013023428618907928,
+      "depth": 0.43456360697746277,
+      "duration": 0.0,
+      "snr": 0.008013729006052017,
+      "shape_score": 0.0,
+      "odd_even_diff": 0.006087060086429119,
+      "secondary_depth": 0.00030755504849366844,
+      "secondary_ratio": 0.0,
+      "out_transit_var": 0.42282527685165405,
+      "symmetry": 0.0006874904502183199,
+      "odd_depth": 0.0013188979355618358,
+      "even_depth": 0.009096482768654823,
+      "secondary_phase_flux": 0.03895092383027077,
+      "ingress_slope": 0.0,
+      "egress_slope": 0.0,
+      "transit_symmetry": 0.0,
+      "u_shape_score": 0.0,
+      "v_shape_score": 0.0,
+      "out_of_transit_rms": 0.0,
+      "depth_to_rms": 0.00928164180368185,
+      "transit_bottom_width": 0.0,
+      "transit_full_width": 0.0,
+      "in_transit_points": 0.0,
+      "out_of_transit_points": 0.0,
+      "folded_point_count": 0.017767587676644325,
+      "binned_transit_min_flux": 0.0048862942494452,
+      "binned_transit_depth": 0.0,
+      "transit_centroid_offset": 0.03318992257118225
+    }
+  },
+  "feature_importance_summary": {
+    "top_random_forest": [
+      {
+        "feature": "out_transit_var",
+        "importance": 0.14949835450595783
+      },
+      {
+        "feature": "out_of_transit_rms",
+        "importance": 0.13418231724082108
+      },
+      {
+        "feature": "folded_point_count",
+        "importance": 0.11856131329799854
+      },
+      {
+        "feature": "depth_to_rms",
+        "importance": 0.0874286626127293
+      },
+      {
+        "feature": "depth",
+        "importance": 0.0805702412100426
+      }
+    ],
+    "top_xgboost": [
+      {
+        "feature": "depth",
+        "importance": 0.43456360697746277
+      },
+      {
+        "feature": "out_transit_var",
+        "importance": 0.42282527685165405
+      },
+      {
+        "feature": "secondary_phase_flux",
+        "importance": 0.03895092383027077
+      },
+      {
+        "feature": "transit_centroid_offset",
+        "importance": 0.03318992257118225
+      },
+      {
+        "feature": "folded_point_count",
+        "importance": 0.017767587676644325
+      }
+    ]
+  }
+}

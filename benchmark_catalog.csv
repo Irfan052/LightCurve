@@ -1,0 +1,5 @@
+tic_id,true_period,true_depth,true_duration,class_label
+9991,3.5,0.01,0.15,exoplanet_transit
+9992,5.0,0.05,0.2,eclipsing_binary
+9993,1.2,0.02,0.0,stellar_variability
+9994,0.0,0.0,0.0,instrumental_artifact
