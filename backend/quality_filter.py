@@ -49,15 +49,8 @@ def remove_nans_and_inf(
     if len(time) == 0:
         return time, flux, flux_err, quality, 0
         
-    # Check for finite values only (removed the flux > 0 restriction)
-    clean_mask = (
-        ~np.isnan(time) & 
-        ~np.isnan(flux) & 
-        ~np.isnan(flux_err) &
-        ~np.isinf(time) & 
-        ~np.isinf(flux) & 
-        ~np.isinf(flux_err)
-    )
+    # Finite-value validation only; negative or zero flux values remain valid.
+    clean_mask = np.isfinite(time) & np.isfinite(flux) & np.isfinite(flux_err)
     
     removed_count = int(len(time) - np.sum(clean_mask))
     cleaned_quality = quality[clean_mask] if quality is not None else None
@@ -222,7 +215,12 @@ def clean_lightcurve(
         t_work, f_work, fe_work, q_work, nan_inf_count = remove_nans_and_inf(time, flux, flux_err, quality)
         metrics["nan_inf_removed"] = nan_inf_count
         
-        # Step 2: Quality Flag Bitmasking
+        # Step 2: Detect gaps on the cadence-cleaned timeline before quality masking so
+        # orbit/downlink boundaries remain stable even if flagged points are removed.
+        gap_stats = detect_observation_gaps(t_work, gap_threshold_days)
+        metrics.update(gap_stats)
+
+        # Step 3: Quality Flag Bitmasking
         if q_work is not None:
             t_work, f_work, fe_work, q_removed, breakdown = mask_tess_quality_flags(
                 t_work, f_work, fe_work, q_work, quality_bitmask, strict_quality_mode
@@ -233,10 +231,6 @@ def clean_lightcurve(
         else:
             metrics["quality_points_retained"] = len(t_work)
             
-        # Step 3: Gap Detection
-        gap_stats = detect_observation_gaps(t_work, gap_threshold_days)
-        metrics.update(gap_stats)
-        
         # Step 4: Asymmetric Sigma-Clipping
         t_clean, f_clean, fe_clean, sigma_count = sigma_clip(
             t_work, f_work, fe_work, sigma_upper, sigma_lower
