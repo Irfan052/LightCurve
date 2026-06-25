@@ -2,15 +2,16 @@ import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, Optional, Union
 import lightkurve as lk
 from backend.utils import logger
 
 def generate_synthetic_lightcurve(
     target_type: str, 
     length_days: float = 27.0, 
-    cadence_minutes: float = 10.0
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    cadence_minutes: float = 10.0,
+    return_params: bool = False
+) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]]:
     """
     Generates a realistic synthetic light curve for hackathon testing and demo.
     
@@ -52,6 +53,14 @@ def generate_synthetic_lightcurve(
     flux_err = np.full_like(time, noise_level)
     flux += np.random.normal(0, noise_level, size=num_points)
     
+    ground_truth = {
+        "period": 0.0,
+        "epoch": 0.0,
+        "depth": 0.0,
+        "duration": 0.0,
+        "snr": 5.0
+    }
+
     # 3. Inject signals based on class
     if target_type == "exoplanet_transit":
         # Period, Epoch, Depth, Duration
@@ -61,6 +70,14 @@ def generate_synthetic_lightcurve(
         duration_hours = np.random.uniform(2.5, 4.5)
         duration_days = duration_hours / 24.0
         
+        ground_truth.update({
+            "period": period,
+            "epoch": epoch,
+            "depth": depth,
+            "duration": duration_days,
+            "snr": 20.0
+        })
+
         # Calculate phases and inject U-shaped transits
         phases = ((time - epoch) % period) / period
         # Map phases to range [-0.5, 0.5]
@@ -81,6 +98,14 @@ def generate_synthetic_lightcurve(
         duration_hours = np.random.uniform(3.0, 5.0)
         duration_days = duration_hours / 24.0
         
+        ground_truth.update({
+            "period": period,
+            "epoch": epoch,
+            "depth": primary_depth,
+            "duration": duration_days,
+            "snr": 50.0
+        })
+
         # Primary eclipse (at phase 0.0)
         phases_pri = ((time - epoch) % period) / period
         phases_pri = np.where(phases_pri > 0.5, phases_pri - 1.0, phases_pri)
@@ -111,6 +136,8 @@ def generate_synthetic_lightcurve(
         shift_idx = int(num_points * np.random.uniform(0.3, 0.7))
         flux[shift_idx:] += np.random.uniform(-0.015, 0.015)
         
+    if return_params:
+        return time, flux, flux_err, ground_truth
     return time, flux, flux_err
 
 def load_tess_lightcurve(tic_id: str) -> Dict[str, Any]:
@@ -119,7 +146,11 @@ def load_tess_lightcurve(tic_id: str) -> Dict[str, Any]:
     If the TIC ID is mock (e.g., TIC 9991, TIC 9992, TIC 9993, TIC 9994) or if the MAST API fails,
     it automatically falls back to generating high-fidelity synthetic data.
     """
-    tic_str = tic_id.upper().replace("TIC", "").strip()
+    tic_str = tic_id.upper()
+    if tic_str.startswith("TIC"):
+        tic_str = tic_str[3:].strip()
+    else:
+        tic_str = tic_str.strip()
     
     # Check for synthetic/mock overrides
     # TIC 9991: Exoplanet, TIC 9992: EB, TIC 9993: Stellar Var, TIC 9994: Artifact
@@ -145,11 +176,14 @@ def load_tess_lightcurve(tic_id: str) -> Dict[str, Any]:
         # Search for TESS light curves
         search_result = lk.search_lightcurve(f"TIC {tic_str}", mission="TESS")
         if len(search_result) == 0:
-            raise ValueError(f"No TESS data found for TIC {tic_str}.")
+            raise ValueError(f"No TESS data found for TIC {tic_str}. It may not have been observed by TESS or the ID is invalid.")
             
         # Download the first available sector
         logger.info(f"Downloading light curve for TIC {tic_str}...")
         lc = search_result[0].download()
+        
+        if lc is None:
+            raise ValueError(f"Failed to download light curve for TIC {tic_str}. The download might be corrupted or network failed.")
         
         # Extract quality-filtered values
         # Keep only good quality flags (quality == 0)
@@ -157,6 +191,9 @@ def load_tess_lightcurve(tic_id: str) -> Dict[str, Any]:
         time = lc.time[mask].value
         flux = lc.flux[mask].value
         flux_err = lc.flux_err[mask].value
+        
+        if len(time) == 0:
+            raise ValueError(f"No high-quality data points available for TIC {tic_str} after filtering.")
         
         # Normalize the flux if not already normalized
         median_flux = np.nanmedian(flux)
@@ -173,63 +210,80 @@ def load_tess_lightcurve(tic_id: str) -> Dict[str, Any]:
             "is_mock": False
         }
         
+    except lk.search.SearchError as e:
+        logger.error(f"Network or MAST API failure for TIC {tic_str}: {str(e)}")
+        raise ConnectionError(f"Network failure while communicating with MAST API: {str(e)}")
+    except ValueError as e:
+        logger.error(str(e))
+        raise
     except Exception as e:
-        logger.warning(f"Failed to fetch data for TIC {tic_str}: {str(e)}. Falling back to synthetic exoplanet transit.")
-        # Fallback to a mock exoplanet lightcurve so the pipeline doesn't break
-        time, flux, flux_err = generate_synthetic_lightcurve("exoplanet_transit")
-        return {
-            "time": time,
-            "flux": flux,
-            "flux_err": flux_err,
-            "target_name": f"TIC {tic_str} (Mock Fallback)",
-            "is_mock": True
-        }
+        logger.error(f"Unexpected error fetching data for TIC {tic_str}: {str(e)}")
+        raise RuntimeError(f"Corrupted download or unexpected error: {str(e)}")
 
 def load_uploaded_file(file_path: str) -> Dict[str, Any]:
     """Reads a CSV file containing columns: time, flux, and optionally flux_err."""
     logger.info(f"Loading uploaded file: {file_path}")
     ext = Path(file_path).suffix.lower()
     
-    if ext == ".csv":
+    if ext != ".csv":
+        raise ValueError(f"Unsupported file type: {ext}. Only CSV files are supported.")
+        
+    try:
         df = pd.read_csv(file_path)
-        # Standardize column headers (case insensitive)
-        df.columns = [c.lower().strip() for c in df.columns]
+    except Exception as e:
+        raise ValueError(f"Failed to parse CSV file: {str(e)}. Please ensure it is a valid text CSV.")
         
-        if "time" not in df.columns or "flux" not in df.columns:
-            raise ValueError("CSV file must contain 'time' and 'flux' columns.")
-            
-        time = df["time"].values
-        flux = df["flux"].values
+    if df.empty:
+        raise ValueError("The uploaded CSV file is empty.")
         
-        if "flux_err" in df.columns:
-            flux_err = df["flux_err"].values
-        else:
-            flux_err = np.full_like(flux, 0.001)
-            
-        # Sort by time
-        sort_idx = np.argsort(time)
-        time = time[sort_idx]
-        flux = flux[sort_idx]
-        flux_err = flux_err[sort_idx]
+    # Standardize column headers (case insensitive)
+    df.columns = [str(c).lower().strip() for c in df.columns]
+    
+    if "time" not in df.columns or "flux" not in df.columns:
+        raise ValueError("CSV file must contain 'time' and 'flux' columns.")
         
-        # Clean NaNs
-        nan_mask = ~(np.isnan(time) | np.isnan(flux))
-        time = time[nan_mask]
-        flux = flux[nan_mask]
-        flux_err = flux_err[nan_mask]
+    # Coerce to numeric, turning non-numeric into NaN
+    df["time"] = pd.to_numeric(df["time"], errors="coerce")
+    df["flux"] = pd.to_numeric(df["flux"], errors="coerce")
+    
+    # Check for excessive NaNs or entirely non-numeric columns
+    if df["time"].isna().all() or df["flux"].isna().all():
+        raise ValueError("The 'time' and 'flux' columns must contain numeric values.")
         
-        # Normalize
-        median_flux = np.nanmedian(flux)
-        if median_flux > 0:
-            flux = flux / median_flux
-            flux_err = flux_err / median_flux
-            
-        return {
-            "time": time,
-            "flux": flux,
-            "flux_err": flux_err,
-            "target_name": Path(file_path).stem,
-            "is_mock": False
-        }
+    time = df["time"].values
+    flux = df["flux"].values
+    
+    if "flux_err" in df.columns:
+        df["flux_err"] = pd.to_numeric(df["flux_err"], errors="coerce")
+        flux_err = df["flux_err"].values
     else:
-        raise ValueError(f"Unsupported file type: {ext}. Only CSV files are supported in this demo.")
+        flux_err = np.full_like(flux, 0.001)
+        
+    # Sort by time
+    sort_idx = np.argsort(time)
+    time = time[sort_idx]
+    flux = flux[sort_idx]
+    flux_err = flux_err[sort_idx]
+    
+    # Clean NaNs
+    nan_mask = ~(np.isnan(time) | np.isnan(flux) | np.isnan(flux_err))
+    time = time[nan_mask]
+    flux = flux[nan_mask]
+    flux_err = flux_err[nan_mask]
+    
+    if len(time) == 0:
+        raise ValueError("CSV file contained no valid numeric data points after cleaning.")
+        
+    # Normalize
+    median_flux = np.nanmedian(flux)
+    if median_flux > 0:
+        flux = flux / median_flux
+        flux_err = flux_err / median_flux
+        
+    return {
+        "time": time,
+        "flux": flux,
+        "flux_err": flux_err,
+        "target_name": Path(file_path).stem,
+        "is_mock": False
+    }

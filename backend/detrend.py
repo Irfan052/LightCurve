@@ -362,6 +362,8 @@ def flatten_lightcurve(
     invalid_trend = ~np.isfinite(trend_flux) | (np.abs(trend_flux) <= 1e-8)
     if np.any(invalid_trend):
         fallback_level = _safe_median(flux, fallback=1.0)
+        if abs(fallback_level) <= 1e-8:
+            fallback_level = 1.0
         trend_flux[invalid_trend] = fallback_level
 
     flat_flux = flux / trend_flux

@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-06-25T04:24:33.737632+00:00",
+  "synthetic_model_metrics": {
+    "accuracy": 0.75,
+    "precision": 0.625,
+    "recall": 0.75,
+    "f1_score": 0.6666666666666666
+  },
+  "hybrid_model_metrics": {
+    "accuracy": 0.7619047619047619,
+    "precision": 0.625,
+    "recall": 0.75,
+    "f1_score": 0.6666666666666666
+  },
+  "synthetic_samples": 160,
+  "hybrid_samples": 166
+}

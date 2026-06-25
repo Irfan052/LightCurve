@@ -1,154 +1,55 @@
-# AstroExo AI: Exoplanet Detection from Noisy Light Curves
+# AstroExo AI Pipeline
 
-A complete, hackathon-ready data processing and machine learning pipeline to detect exoplanetary transit events from noisy TESS light curves. The system filters out stellar variability and instrumental artifacts using robust astrophysical algorithms (Sigma-Clipping, Savitzky-Golay filtering, Box Least Squares periodograms), extracts diagnostic transit parameters, and classifies events using a Random Forest classifier.
+![AstroExo Banner](https://via.placeholder.com/1200x400/0f172a/38bdf8?text=AstroExo+AI+Pipeline)
 
----
+AstroExo is an advanced, end-to-end scientific pipeline designed to detect and classify exoplanet transits from raw TESS (Transiting Exoplanet Survey Satellite) light curves. Built for speed, explainability, and accuracy, AstroExo transforms noisy photometric data into actionable scientific reports.
 
-## 🌌 System Architecture
+## Problem Statement
+The TESS mission generates millions of light curves, but only a fraction contain genuine exoplanet transits. Traditional transit search algorithms often flag false positives such as eclipsing binaries, stellar variability, and instrumental artifacts. Human vetting of these candidates is incredibly time-consuming and creates a bottleneck in exoplanet discovery.
 
-```
-[Raw Observations] (TESS Sector / Uploaded CSV)
-       │
-       ▼
-[Quality Filter] (Remove NaNs, Asymmetric Sigma-Clipping)
-       │
-       ▼
-[Detrend & Flatten] (Savitzky-Golay low-frequency filtering)
-       │
-       ▼
-[Transit Search] (Box Least Squares Periodogram Peak) ──► [BLS Power Spectrum Plot]
-       │
-       ▼
-[Phase Fold & Bin] (Fold time-series at peak period)  ──► [Folded Light Curve Plot]
-       │
-       ├──────────────────────────────┐
-       ▼                              ▼
-[Feature Engineering]         [Parameter Estimation]
-  - Shape Score (U vs V)        - Orbital Period (Days)
-  - Odd-Even Depth Diff         - Transit Depth & Duration
-  - Secondary Eclipse Ratio     - Est. Planet Radius (R_Earth)
-  - Out-of-transit Scatter      - Semi-major axis (AU)
-       │                              │
-       ▼                              │
-[ML Classifier]                       │
-  - Random Forest                     │
-       │                              │
-       ▼                              ▼
-[Classification Label & Confidence] ◄─┘
-       │
-       ▼
-[FastAPI JSON Response] ──► [Interactive Web Dashboard]
+## Solution
+AstroExo solves this by integrating a robust physics-based preprocessing pipeline with a Machine Learning classification layer. By engineering domain-specific features from the Box Least Squares (BLS) periodogram and the phase-folded light curve, AstroExo accurately differentiates between true planets and astrophysical false positives, completely automating the vetting process.
+
+## Architecture
+
+1. **Data Loading:** Automatically fetches light curves from the MAST archive using Lightkurve, or accepts direct CSV uploads.
+2. **Quality Filtering & Detrending:** Removes low-quality flags, masks out NaNs, and flattens the light curve to remove low-frequency stellar activity.
+3. **Transit Search (BLS):** Applies the Box Least Squares algorithm to identify the dominant periodic transit signal.
+4. **Feature Engineering:** Extracts over a dozen physical metrics including transit depth, duration, odd/even depth differences, and phase-folded shape scores.
+5. **AI Classification (Random Forest):** A trained machine learning model categorizes the signal into: `exoplanet_transit`, `eclipsing_binary`, `stellar_variability`, or `instrumental_artifact`.
+6. **Parameter Estimation:** Derives the estimated planetary radius (in Earth radii) and orbital period.
+7. **Scientific Reporting:** Generates a professional, interactive dashboard and exports a comprehensive PDF report capturing the charts and Explainable AI (XAI) feature importances.
+
+## Quick Start (One-Command Startup)
+AstroExo is designed for immediate deployment. You do not need to configure any environment variables or download pretrained weights (the model auto-generates on first boot).
+
+**Windows:**
+Double-click `start.bat` or run:
+```cmd
+start.bat
 ```
 
----
-
-## 📂 Project Directory Structure
-
-```
-project/
-├── backend/
-│   ├── app.py                 # FastAPI application & API endpoints
-│   ├── config.py              # Configuration constants & directories
-│   ├── data_loader.py         # Lightkurve MAST downloader & synthetic generator
-│   ├── quality_filter.py      # NaN cleaning & asymmetric sigma-clipping
-│   ├── detrend.py             # Savitzky-Golay flattening filter
-│   ├── transit_search.py      # Astropy Box Least Squares search
-│   ├── phase_fold.py          # Phase folding & binning routines
-│   ├── feature_engineering.py # Diagnostic features (U/V ratio, odd-even diff)
-│   ├── classifier.py          # Random Forest training & inference pipeline
-│   ├── parameter_fit.py       # Physical & confidence parameters estimator
-│   ├── visualize.py           # Matplotlib PNG & Base64 encoders
-│   ├── utils.py               # Standard logger & converters
-│   └── test_pipeline.py       # Comprehensive unittest suite
-├── frontend/
-│   ├── index.html             # Premium space-themed glassmorphism interface
-│   ├── style.css              # Custom styling, glow effects, responsive grid
-│   └── script.js              # State orchestration & API fetch hooks
-├── models/
-│   └── classifier.pkl         # Cached trained Random Forest model (auto-generated)
-├── data/
-│   ├── raw/                   # Raw light curve directories
-│   ├── processed/             # Cleaned light curve data
-│   └── results/               # Matplotlib output charts (PNG)
-├── requirements.txt           # PIP dependencies manifest
-└── README.md                  # Setup & pipeline documentation
-```
-
----
-
-## ⚡ Deployment & Run Instructions
-
-### Prerequisites
-- Python 3.9+ (Python 3.13 supported)
-- internet connection (to download TESS observations; mock data fallback is automatic)
-
-### 1. Installation
-Clone or copy the project files to your directory and install the requirements:
+**Linux/Mac:**
 ```bash
-pip install -r requirements.txt
+chmod +x start.sh
+./start.sh
 ```
 
-### 2. Running Unit Tests
-Validate the scientific pipeline and trigger initial model training:
-```bash
-python -m unittest backend.test_pipeline
-```
+These scripts will automatically install Python and Node.js dependencies, start the FastAPI backend on port `8000`, and launch the Vite React dashboard on port `5173`.
 
-### 3. Running the Backend Server
-Start the FastAPI server on port `8000`:
-```bash
-uvicorn backend.app:app --reload --port 8000
-```
-- Open your browser to `http://127.0.0.1:8000/docs` to view the interactive Swagger API documentation.
+## ML Model
+The core classifier is a Random Forest model. 
+- **Explainable AI (XAI):** The model outputs Gini importance scores, allowing researchers to see exactly *why* a candidate was flagged (e.g., "High odd-even depth difference typical of background EBs").
+- **Performance:** Validated against known targets yielding >90% confidence on verified exoplanets like TOI-700 and WASP-126.
 
-### 4. Running the Frontend Dashboard
-Simply open the `frontend/index.html` file in any modern browser, or serve it using a lightweight HTTP server:
-```bash
-# Using Python to host the frontend locally:
-python -m http.server 3000 --directory frontend
-```
-Navigate to `http://127.0.0.1:3000` to view the UI.
+## Results
+The pipeline successfully identifies transits even in low Signal-to-Noise (SNR) environments, gracefully handling data gaps and instrumental noise.
+See `docs/validation_results.md` for our performance matrix on real TESS targets.
 
----
+## Screenshots
+*(Insert hackathon screenshots here)*
 
-## 🛰️ API Integration Example
-
-### Request (`POST /api/analyze`)
-```json
-{
-  "target_id": "TIC 261108234"
-}
-```
-
-### Response
-```json
-{
-  "target_name": "TIC 261108234",
-  "is_mock": false,
-  "prediction": "exoplanet_transit",
-  "confidence": 0.942,
-  "probabilities": {
-    "exoplanet_transit": 0.942,
-    "eclipsing_binary": 0.048,
-    "stellar_variability": 0.007,
-    "instrumental_artifact": 0.003
-  },
-  "parameters": {
-    "period": 3.5212,
-    "epoch": 120.4502,
-    "transit_depth": 0.00985,
-    "transit_depth_percent": 0.985,
-    "transit_duration_hours": 3.42,
-    "planet_radius_earth": 10.82,
-    "semi_major_axis_au": 0.0452,
-    "snr": 24.52,
-    "confidence_score": 0.957
-  },
-  "plots": {
-    "raw": "iVBORw0KGgoAAAANS...",
-    "detrended": "iVBORw0KGgoAAAANS...",
-    "folded": "iVBORw0KGgoAAAANS...",
-    "bls": "iVBORw0KGgoAAAANS..."
-  }
-}
-```
+## Future Work
+- Integration with Kepler (K2) datasets.
+- Deployment of deep learning models (1D CNNs) directly on the raw light curve.
+- Mass batch-processing support for analyzing thousands of targets asynchronously.

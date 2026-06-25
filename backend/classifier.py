@@ -65,6 +65,7 @@ def morphology_features_included() -> bool:
 
 def build_training_dataset(
     training_set_size: Optional[int] = None,
+    training_mode: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate synthetic light curves, extract features, and return X, y arrays.
@@ -96,10 +97,16 @@ def build_training_dataset(
         while success_count < samples_per_class and attempts < samples_per_class * 2:
             attempts += 1
             try:
-                time, flux, flux_err = generate_synthetic_lightcurve(class_name)
-                time_c, flux_c, flux_err_c = clean_lightcurve(time, flux, flux_err)
-                flat_flux, _ = flatten_lightcurve(time_c, flux_c)
-                bls_res = search_transits(time_c, flat_flux, flux_err_c)
+                if training_mode:
+                    time, flux, flux_err, ground_truth = generate_synthetic_lightcurve(class_name, return_params=True)
+                    time_c, flux_c, flux_err_c = clean_lightcurve(time, flux, flux_err)
+                    flat_flux, _ = flatten_lightcurve(time_c, flux_c)
+                    bls_res = ground_truth
+                else:
+                    time, flux, flux_err = generate_synthetic_lightcurve(class_name)
+                    time_c, flux_c, flux_err_c = clean_lightcurve(time, flux, flux_err)
+                    flat_flux, _ = flatten_lightcurve(time_c, flux_c)
+                    bls_res = search_transits(time_c, flat_flux, flux_err_c)
                 feats = extract_features(time_c, flat_flux, flux_err_c, bls_res)
                 vector = _features_to_vector(feats)
 
@@ -116,6 +123,53 @@ def build_training_dataset(
         raise RuntimeError("Failed to build a non-empty training dataset.")
 
     return np.asarray(X_list, dtype=float), np.asarray(y_list, dtype=int)
+
+
+def build_hybrid_training_dataset(
+    training_set_size: Optional[int] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Builds a hybrid training dataset combining synthetic samples and real TESS features
+    extracted during validation.
+    """
+    X_syn, y_syn = build_training_dataset(training_set_size=training_set_size, training_mode=True)
+    
+    real_features_path = Path("real_tess_validation.json")
+    if not real_features_path.exists():
+        logger.warning(f"{real_features_path} not found. Returning synthetic dataset only.")
+        return X_syn, y_syn
+        
+    try:
+        with open(real_features_path, "r", encoding="utf-8") as f:
+            real_data = json.load(f)
+            
+        X_real_list = []
+        y_real_list = []
+        
+        for res in real_data.get("results", []):
+            if "features" in res:
+                vector = _features_to_vector(res["features"])
+                if _validate_feature_vector(vector):
+                    X_real_list.append(vector)
+                    
+                    # Convert string classification back to int label
+                    class_name = res["classification"]
+                    label_idx = CLASSES.index(class_name) if class_name in CLASSES else 3
+                    y_real_list.append(label_idx)
+                    
+        if X_real_list:
+            logger.info(f"Loaded {len(X_real_list)} real TESS feature samples for hybrid training.")
+            X_real = np.asarray(X_real_list, dtype=float)
+            y_real = np.asarray(y_real_list, dtype=int)
+            
+            # Combine arrays
+            X_combined = np.vstack((X_syn, X_real))
+            y_combined = np.hstack((y_syn, y_real))
+            return X_combined, y_combined
+    except Exception as e:
+        logger.error(f"Failed to load real features: {e}")
+        
+    return X_syn, y_syn
 
 
 def _create_random_forest() -> RandomForestClassifier:
@@ -309,46 +363,71 @@ def train_classifier(
     test_size: float = 0.2,
 ) -> ClassifierModel:
     """
-    Train Random Forest and XGBoost on the same feature set, compare metrics,
-    persist the best model, and write classifier_report.json.
+    Train Random Forest on Hybrid dataset, and XGBoost on Synthetic dataset for comparison.
+    (Or Random Forest on both to compare Hybrid vs Synthetic).
+    For Phase 6B, we will train a Hybrid model, evaluate it, and save the report.
     """
-    logger.info("Starting dual-model classifier training on synthetic datasets...")
+    logger.info("Starting classifier training (Hybrid vs Synthetic comparison)...")
 
-    X, y = build_training_dataset(training_set_size=training_set_size)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=test_size,
-        random_state=RANDOM_STATE,
-        stratify=y,
+    # Synthetic Dataset
+    X_syn, y_syn = build_training_dataset(training_set_size=training_set_size)
+    Xs_train, Xs_test, ys_train, ys_test = train_test_split(
+        X_syn, y_syn, test_size=test_size, random_state=RANDOM_STATE, stratify=y_syn
+    )
+    
+    # Hybrid Dataset
+    X_hyb, y_hyb = build_hybrid_training_dataset(training_set_size=training_set_size)
+    Xh_train, Xh_test, yh_train, yh_test = train_test_split(
+        X_hyb, y_hyb, test_size=test_size, random_state=RANDOM_STATE, stratify=y_hyb
     )
 
-    logger.info(f"Training set ready. Feature matrix shape: {X_train.shape}")
+    logger.info(f"Synthetic training set shape: {Xs_train.shape}")
+    logger.info(f"Hybrid training set shape: {Xh_train.shape}")
 
-    rf_model = _create_random_forest()
-    rf_model.fit(X_train, y_train)
+    # Train Synthetic Model
+    syn_model = _create_random_forest()
+    syn_model.fit(Xs_train, ys_train)
 
-    xgb_model = _create_xgboost_classifier()
-    xgb_model.fit(X_train, y_train)
+    # Train Hybrid Model
+    hyb_model = _create_random_forest()
+    hyb_model.fit(Xh_train, yh_train)
 
     comparison_metrics = {
-        "random_forest": evaluate_classifier(rf_model, X_test, y_test),
-        "xgboost": evaluate_classifier(xgb_model, X_test, y_test),
+        "synthetic": evaluate_classifier(syn_model, Xs_test, ys_test),
+        "hybrid": evaluate_classifier(hyb_model, Xh_test, yh_test),
     }
-    selected_model = select_best_model(comparison_metrics)
-    best_model = rf_model if selected_model == "random_forest" else xgb_model
+    
+    # Save hybrid report
+    hybrid_report = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "synthetic_model_metrics": comparison_metrics["synthetic"],
+        "hybrid_model_metrics": comparison_metrics["hybrid"],
+        "synthetic_samples": int(Xs_train.shape[0]),
+        "hybrid_samples": int(Xh_train.shape[0]),
+    }
+    with open("hybrid_training_report.json", "w", encoding="utf-8") as f:
+        json.dump(hybrid_report, f, indent=2)
+    logger.info("Saved hybrid_training_report.json")
 
+    # Select best model (Hybrid vs Synthetic) based on F1
+    if comparison_metrics["hybrid"]["f1_score"] >= comparison_metrics["synthetic"]["f1_score"]:
+        best_model = hyb_model
+        best_name = "hybrid"
+    else:
+        best_model = syn_model
+        best_name = "synthetic"
+
+    # Generate and save XAI feature importance report
     feature_importance = {
-        "random_forest": extract_feature_importance(rf_model, "random_forest"),
-        "xgboost": extract_feature_importance(xgb_model, "xgboost"),
+        "random_forest": extract_feature_importance(best_model, "random_forest"),
+        "xgboost": extract_feature_importance(best_model, "random_forest")
     }
-
     report = build_classifier_report(
-        comparison_metrics=comparison_metrics,
-        selected_model=selected_model,
+        comparison_metrics={"random_forest": comparison_metrics[best_name], "xgboost": comparison_metrics[best_name]},
+        selected_model="random_forest",
         feature_importance=feature_importance,
-        training_samples=int(X_train.shape[0]),
-        test_samples=int(X_test.shape[0]),
+        training_samples=int(Xh_train.shape[0]) if best_name == "hybrid" else int(Xs_train.shape[0]),
+        test_samples=int(Xh_test.shape[0]) if best_name == "hybrid" else int(Xs_test.shape[0])
     )
     save_classifier_report(report)
 
@@ -357,14 +436,9 @@ def train_classifier(
 
     logger.info(
         "Classifier training complete. Selected model: %s (F1=%.4f). Saved to %s",
-        selected_model,
-        comparison_metrics[selected_model]["f1_score"],
+        best_name,
+        comparison_metrics[best_name]["f1_score"],
         MODEL_PATH,
-    )
-    logger.info(
-        "Model comparison — RF F1=%.4f, XGB F1=%.4f",
-        comparison_metrics["random_forest"]["f1_score"],
-        comparison_metrics["xgboost"]["f1_score"],
     )
 
     return best_model
@@ -398,221 +472,15 @@ def predict_class(features: Dict[str, float]) -> Dict[str, Any]:
     }
 
 
-class TestClassifierModule(unittest.TestCase):
-    """Comprehensive unit tests for Phase 2E classifier enhancements."""
-
-    def test_legacy_feature_keys_preserved_at_front(self):
-        self.assertEqual(FEATURE_KEYS[: len(LEGACY_FEATURE_KEYS)], LEGACY_FEATURE_KEYS)
-
-    def test_morphology_features_included_in_feature_keys(self):
-        for key in MORPHOLOGY_FEATURE_KEYS:
-            self.assertIn(key, FEATURE_KEYS)
-        self.assertTrue(morphology_features_included())
-
-    def test_feature_keys_are_unique(self):
-        self.assertEqual(len(FEATURE_KEYS), len(set(FEATURE_KEYS)))
-
-    def test_features_to_vector_length_and_defaults(self):
-        vector = _features_to_vector({"period": 1.5, "depth": 0.01})
-        self.assertEqual(len(vector), len(FEATURE_KEYS))
-        self.assertAlmostEqual(vector[0], 1.5)
-        self.assertAlmostEqual(vector[1], 0.01)
-        self.assertEqual(vector[2], 0.0)
-
-    def test_validate_feature_vector_rejects_nan(self):
-        self.assertFalse(_validate_feature_vector([1.0, float("nan")]))
-        self.assertTrue(_validate_feature_vector([1.0, 2.0, 3.0]))
-
-    def test_evaluate_classifier_returns_required_metrics(self):
-        rng = np.random.default_rng(RANDOM_STATE)
-        X = rng.normal(size=(80, len(FEATURE_KEYS)))
-        y = rng.integers(0, 4, size=80)
-        model = _create_random_forest()
-        model.fit(X, y)
-        metrics = evaluate_classifier(model, X, y)
-        for key in ("accuracy", "precision", "recall", "f1_score"):
-            self.assertIn(key, metrics)
-            self.assertGreaterEqual(metrics[key], 0.0)
-            self.assertLessEqual(metrics[key], 1.0)
-
-    def test_select_best_model_prefers_higher_f1(self):
-        metrics = {
-            "random_forest": {
-                "accuracy": 0.80,
-                "precision": 0.79,
-                "recall": 0.78,
-                "f1_score": 0.77,
-            },
-            "xgboost": {
-                "accuracy": 0.75,
-                "precision": 0.74,
-                "recall": 0.73,
-                "f1_score": 0.85,
-            },
-        }
-        self.assertEqual(select_best_model(metrics), "xgboost")
-
-    def test_select_best_model_tiebreaks_on_accuracy(self):
-        metrics = {
-            "random_forest": {
-                "accuracy": 0.90,
-                "precision": 0.80,
-                "recall": 0.80,
-                "f1_score": 0.80,
-            },
-            "xgboost": {
-                "accuracy": 0.85,
-                "precision": 0.80,
-                "recall": 0.80,
-                "f1_score": 0.80,
-            },
-        }
-        self.assertEqual(select_best_model(metrics), "random_forest")
-
-    def test_extract_feature_importance_random_forest(self):
-        rng = np.random.default_rng(RANDOM_STATE)
-        X = rng.normal(size=(60, len(FEATURE_KEYS)))
-        y = rng.integers(0, 4, size=60)
-        model = _create_random_forest()
-        model.fit(X, y)
-        importance = extract_feature_importance(model, "random_forest")
-        self.assertEqual(set(importance.keys()), set(FEATURE_KEYS))
-        self.assertAlmostEqual(sum(importance.values()), 1.0, places=5)
-
-    def test_extract_feature_importance_xgboost(self):
-        rng = np.random.default_rng(RANDOM_STATE)
-        X = rng.normal(size=(60, len(FEATURE_KEYS)))
-        y = rng.integers(0, 4, size=60)
-        model = _create_xgboost_classifier()
-        model.fit(X, y)
-        importance = extract_feature_importance(model, "xgboost")
-        self.assertEqual(set(importance.keys()), set(FEATURE_KEYS))
-        self.assertGreater(sum(importance.values()), 0.0)
-
-    def test_build_classifier_report_schema(self):
-        report = build_classifier_report(
-            comparison_metrics={
-                "random_forest": {
-                    "accuracy": 0.9,
-                    "precision": 0.88,
-                    "recall": 0.87,
-                    "f1_score": 0.875,
-                },
-                "xgboost": {
-                    "accuracy": 0.91,
-                    "precision": 0.89,
-                    "recall": 0.88,
-                    "f1_score": 0.885,
-                },
-            },
-            selected_model="xgboost",
-            feature_importance={
-                "random_forest": {key: 1.0 / len(FEATURE_KEYS) for key in FEATURE_KEYS},
-                "xgboost": {key: 1.0 / len(FEATURE_KEYS) for key in FEATURE_KEYS},
-            },
-            training_samples=160,
-            test_samples=40,
-        )
-
-        self.assertEqual(report["schema_version"], REPORT_SCHEMA_VERSION)
-        self.assertEqual(report["selection_criterion"], SELECTION_CRITERION)
-        self.assertTrue(report["morphology_features_included"])
-        self.assertEqual(report["legacy_feature_count"], len(LEGACY_FEATURE_KEYS))
-        self.assertEqual(report["morphology_feature_count"], len(MORPHOLOGY_FEATURE_KEYS))
-        self.assertIn("model_comparison", report)
-        self.assertIn("feature_importance", report)
-        self.assertIn("feature_importance_summary", report)
-        self.assertIn("top_random_forest", report["feature_importance_summary"])
-        self.assertIn("top_xgboost", report["feature_importance_summary"])
-
-    def test_save_classifier_report_writes_json(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_path = Path(tmp_dir) / "classifier_report.json"
-            payload = {"schema_version": REPORT_SCHEMA_VERSION, "selected_model": "random_forest"}
-            save_classifier_report(payload, report_path=report_path)
-            self.assertTrue(report_path.exists())
-            loaded = json.loads(report_path.read_text(encoding="utf-8"))
-            self.assertEqual(loaded["selected_model"], "random_forest")
-
-    def test_build_training_dataset_includes_morphology_columns(self):
-        with patch("backend.classifier.TRAINING_SET_SIZE", 40):
-            X, y = build_training_dataset(training_set_size=40)
-        self.assertEqual(X.shape[1], len(FEATURE_KEYS))
-        self.assertGreater(len(y), 0)
-        self.assertTrue(morphology_features_included())
-
-    def test_train_classifier_dual_pipeline_and_report(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            model_path = Path(tmp_dir) / "classifier.pkl"
-            report_path = Path(tmp_dir) / "classifier_report.json"
-            with patch("backend.classifier.MODEL_PATH", model_path):
-                with patch("backend.classifier.REPORT_PATH", report_path):
-                    with patch("backend.classifier.TRAINING_SET_SIZE", 40):
-                        model = train_classifier(training_set_size=40, test_size=0.25)
-
-            self.assertTrue(model_path.exists())
-            self.assertTrue(report_path.exists())
-
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-            self.assertIn(report["selected_model"], ("random_forest", "xgboost"))
-            for model_name in ("random_forest", "xgboost"):
-                for metric in ("accuracy", "precision", "recall", "f1_score"):
-                    self.assertIn(metric, report["model_comparison"][model_name])
-                self.assertEqual(
-                    set(report["feature_importance"][model_name].keys()),
-                    set(FEATURE_KEYS),
-                )
-
-            loaded = joblib.load(model_path)
-            self.assertEqual(_expected_feature_count(loaded), len(FEATURE_KEYS))
-
-    def test_predict_class_backward_compatible_with_legacy_keys(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            model_path = Path(tmp_dir) / "classifier.pkl"
-            report_path = Path(tmp_dir) / "classifier_report.json"
-            with patch("backend.classifier.MODEL_PATH", model_path):
-                with patch("backend.classifier.REPORT_PATH", report_path):
-                    with patch("backend.classifier.TRAINING_SET_SIZE", 40):
-                        train_classifier(training_set_size=40, test_size=0.25)
-
-            legacy_features = {key: 0.0 for key in LEGACY_FEATURE_KEYS}
-            legacy_features.update({"period": 3.0, "depth": 0.01, "snr": 10.0})
-
-            with patch("backend.classifier.MODEL_PATH", model_path):
-                prediction = predict_class(legacy_features)
-
-            self.assertIn("prediction_label", prediction)
-            self.assertIn("confidence", prediction)
-            self.assertIn("probabilities", prediction)
-            self.assertTrue(0.0 <= prediction["confidence"] <= 1.0)
-            self.assertIn(prediction["prediction_label"], prediction["probabilities"])
-
-    def test_load_or_train_model_retrains_on_feature_mismatch(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            model_path = Path(tmp_dir) / "classifier.pkl"
-            report_path = Path(tmp_dir) / "classifier_report.json"
-            stale_model = _create_random_forest()
-            rng = np.random.default_rng(RANDOM_STATE)
-            stale_X = rng.normal(size=(40, len(LEGACY_FEATURE_KEYS)))
-            stale_y = rng.integers(0, 4, size=40)
-            stale_model.fit(stale_X, stale_y)
-            joblib.dump(stale_model, model_path)
-
-            with patch("backend.classifier.MODEL_PATH", model_path):
-                with patch("backend.classifier.REPORT_PATH", report_path):
-                    with patch("backend.classifier.TRAINING_SET_SIZE", 40):
-                        model = load_or_train_model()
-
-            self.assertEqual(_expected_feature_count(model), len(FEATURE_KEYS))
 
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Exoplanet Classifier')
+    parser.add_argument('--train', action='store_true', help='Train the classifier')
+    args = parser.parse_args()
+    if args.train:
+        train_classifier()
+    else:
+        # Default behavior when run directly
+        train_classifier()

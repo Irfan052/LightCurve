@@ -159,9 +159,9 @@ def extract_features(
     out_transit_mask = np.abs(phase) > shoulder_width
     secondary_mask = np.abs(np.abs(phase) - 0.5) <= transit_half_width
 
-    features["in_transit_points"] = float(np.sum(in_transit_mask))
-    features["out_of_transit_points"] = float(np.sum(out_transit_mask))
-    features["folded_point_count"] = float(len(phase))
+    features["in_transit_points"] = float(np.sum(in_transit_mask) / len(phase))
+    features["out_of_transit_points"] = float(np.sum(out_transit_mask) / len(phase))
+    features["folded_point_count"] = float(len(phase)) # Keeping this for legacy, but ML won't rely on it as much since the others are fractions.
 
     baseline = _safe_median(fflux[out_transit_mask], default=1.0) if np.sum(out_transit_mask) >= 5 else 1.0
 
@@ -269,7 +269,7 @@ def extract_features(
     right_phase = np.abs(bin_centers[right_mask])[::-1]
 
     min_len = min(len(left_profile), len(right_profile))
-    if min_len >= 3:
+    if min_len >= 1:
         left_profile = left_profile[:min_len]
         right_profile = right_profile[:min_len]
         morphology_scale = max(depth, out_rms, 1e-6)

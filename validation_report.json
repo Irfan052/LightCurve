@@ -1,0 +1,108 @@
+{
+    "metrics": {
+        "mean_period_error": 0.7573855922881727,
+        "median_period_error": 0.7778100003429449,
+        "mean_depth_error": 0.011597996307039074,
+        "mean_duration_error": 0.05,
+        "accuracy": 0.5,
+        "precision": 0.3333333333333333,
+        "recall": 0.5,
+        "f1_score": 0.375,
+        "confusion_matrix": [
+            [
+                1,
+                0,
+                0,
+                0
+            ],
+            [
+                0,
+                1,
+                0,
+                0
+            ],
+            [
+                0,
+                1,
+                0,
+                0
+            ],
+            [
+                0,
+                1,
+                0,
+                0
+            ]
+        ]
+    },
+    "results": [
+        {
+            "tic_id": "9991",
+            "status": "success",
+            "true_class": "exoplanet_transit",
+            "pred_class": "exoplanet_transit",
+            "true_period": 3.5,
+            "pred_period": 4.045504994450612,
+            "period_error": 0.5455049944506118,
+            "true_depth": 0.01,
+            "pred_depth": 0.012055449129699943,
+            "depth_error": 0.0020554491296999426,
+            "true_duration": 0.15,
+            "pred_duration": 0.15,
+            "duration_error": 0.0,
+            "confidence": 0.94
+        },
+        {
+            "tic_id": "9992",
+            "status": "success",
+            "true_class": "eclipsing_binary",
+            "pred_class": "eclipsing_binary",
+            "true_period": 5.0,
+            "pred_period": 6.244111349036404,
+            "period_error": 1.2441113490364044,
+            "true_depth": 0.05,
+            "pred_depth": 0.0262759981887315,
+            "depth_error": 0.023724001811268502,
+            "true_duration": 0.2,
+            "pred_duration": 0.15,
+            "duration_error": 0.05000000000000002,
+            "confidence": 0.9
+        },
+        {
+            "tic_id": "9993",
+            "status": "success",
+            "true_class": "stellar_variability",
+            "pred_class": "exoplanet_transit",
+            "true_period": 1.2,
+            "pred_period": 0.9701889805696036,
+            "period_error": 0.2298110194303964,
+            "true_depth": 0.02,
+            "pred_depth": 0.00035693832200360385,
+            "depth_error": 0.019643061677996395,
+            "true_duration": 0.0,
+            "pred_duration": 0.05,
+            "duration_error": 0.05,
+            "confidence": 0.37
+        },
+        {
+            "tic_id": "9994",
+            "status": "success",
+            "true_class": "instrumental_artifact",
+            "pred_class": "exoplanet_transit",
+            "true_period": 0.0,
+            "pred_period": 1.010115006235278,
+            "period_error": 1.010115006235278,
+            "true_depth": 0.0,
+            "pred_depth": 0.0009694726091914611,
+            "depth_error": 0.0009694726091914611,
+            "true_duration": 0.0,
+            "pred_duration": 0.1,
+            "duration_error": 0.1,
+            "confidence": 0.7
+        }
+    ],
+    "errors": [],
+    "total_targets": 4,
+    "successful_targets": 4,
+    "failed_targets": 0
+}
