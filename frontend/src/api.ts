@@ -3,6 +3,7 @@ import axios from "axios";
 const API_BASE_URL = "http://localhost:8000/api";
 
 export interface AnalysisResult {
+  type?: "lightcurve";
   target_name: string;
   is_mock: boolean;
   prediction: string;
@@ -43,6 +44,12 @@ export interface AnalysisResult {
   };
 }
 
+export interface CatalogResult {
+  type: "catalog";
+  columns: string[];
+  objects: Record<string, any>[];
+}
+
 export const checkHealth = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/health`);
@@ -56,16 +63,20 @@ export const checkHealth = async () => {
 export async function analyzeTarget(
   targetId: string
 ): Promise<AnalysisResult> {
-  const response = await axios.post(`${API_BASE_URL}/analyze`, {
-    target_id: targetId,
-  });
-
-  return response.data;
+  try {
+    // 90 second timeout (90000 ms)
+    const response = await axios.post(`${API_BASE_URL}/analyze`, {
+      target_id: targetId,
+    }, { timeout: 90000 });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
 }
 
 export async function uploadAndAnalyze(
   file: File
-): Promise<AnalysisResult> {
+): Promise<AnalysisResult | CatalogResult> {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -78,7 +89,6 @@ export async function uploadAndAnalyze(
       },
     }
   );
-
   return response.data;
 }
 

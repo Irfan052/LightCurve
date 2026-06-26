@@ -1,6 +1,6 @@
 {
   "schema_version": "phase_2e",
-  "generated_at": "2026-06-25T04:24:33.756792+00:00",
+  "generated_at": "2026-06-25T09:11:26.523519+00:00",
   "feature_keys": [
     "period",
     "depth",
@@ -74,63 +74,63 @@
   },
   "feature_importance": {
     "random_forest": {
-      "period": 0.030617198783155535,
-      "depth": 0.057091125799515786,
-      "duration": 0.03914778421261817,
-      "snr": 0.03193643870255076,
-      "shape_score": 0.004981320415482141,
-      "odd_even_diff": 0.030224182325146166,
-      "secondary_depth": 0.039298620182309674,
-      "secondary_ratio": 0.028867635513962122,
-      "out_transit_var": 0.04680140957200552,
-      "symmetry": 0.009970158338426011,
-      "odd_depth": 0.06181365883670185,
-      "even_depth": 0.08256632022411495,
-      "secondary_phase_flux": 0.027821025435483236,
-      "ingress_slope": 0.0,
+      "period": 0.03061719878315553,
+      "depth": 0.05631507878371867,
+      "duration": 0.039147784212618164,
+      "snr": 0.03193643870255075,
+      "shape_score": 0.005864065530298127,
+      "odd_even_diff": 0.030224182325146162,
+      "secondary_depth": 0.03929862018230967,
+      "secondary_ratio": 0.03082241499569866,
+      "out_transit_var": 0.04691464605350392,
+      "symmetry": 0.00997015833842601,
+      "odd_depth": 0.06556803851742095,
+      "even_depth": 0.08256632022411493,
+      "secondary_phase_flux": 0.016683182166080984,
+      "ingress_slope": 0.00044160308083388613,
       "egress_slope": 0.0,
-      "transit_symmetry": 0.005693278369089082,
-      "u_shape_score": 0.00024393547247591934,
-      "v_shape_score": 0.0,
-      "out_of_transit_rms": 0.054125722292612755,
-      "depth_to_rms": 0.07782910075523687,
-      "transit_bottom_width": 0.005734431757395412,
-      "transit_full_width": 0.03526142739203729,
-      "in_transit_points": 0.039404097083742796,
-      "out_of_transit_points": 0.0407908462548778,
-      "folded_point_count": 0.01750659668394843,
-      "binned_transit_min_flux": 0.13069503753256492,
-      "binned_transit_depth": 0.10157864806454699,
+      "transit_symmetry": 0.005693278369089081,
+      "u_shape_score": 0.000472116920419265,
+      "v_shape_score": 0.0039673631656804735,
+      "out_of_transit_rms": 0.04891773129450315,
+      "depth_to_rms": 0.07275220258138354,
+      "transit_bottom_width": 0.00019706374581208798,
+      "transit_full_width": 0.03526142739203728,
+      "in_transit_points": 0.045361936787461914,
+      "out_of_transit_points": 0.03519392564430514,
+      "folded_point_count": 0.03832654659904066,
+      "binned_transit_min_flux": 0.1306950375325649,
+      "binned_transit_depth": 0.09679163807182607,
       "transit_centroid_offset": 0.0
     },
     "xgboost": {
-      "period": 0.030617198783155535,
-      "depth": 0.057091125799515786,
-      "duration": 0.03914778421261817,
-      "snr": 0.03193643870255076,
-      "shape_score": 0.004981320415482141,
-      "odd_even_diff": 0.030224182325146166,
-      "secondary_depth": 0.039298620182309674,
-      "secondary_ratio": 0.028867635513962122,
-      "out_transit_var": 0.04680140957200552,
-      "symmetry": 0.009970158338426011,
-      "odd_depth": 0.06181365883670185,
-      "even_depth": 0.08256632022411495,
-      "secondary_phase_flux": 0.027821025435483236,
-      "ingress_slope": 0.0,
+      "period": 0.03061719878315553,
+      "depth": 0.05631507878371867,
+      "duration": 0.039147784212618164,
+      "snr": 0.03193643870255075,
+      "shape_score": 0.005864065530298127,
+      "odd_even_diff": 0.030224182325146162,
+      "secondary_depth": 0.03929862018230967,
+      "secondary_ratio": 0.03082241499569866,
+      "out_transit_var": 0.04691464605350392,
+      "symmetry": 0.00997015833842601,
+      "odd_depth": 0.06556803851742095,
+      "even_depth": 0.08256632022411493,
+      "secondary_phase_flux": 0.016683182166080984,
+      "ingress_slope": 0.00044160308083388613,
       "egress_slope": 0.0,
-      "transit_symmetry": 0.005693278369089082,
-      "u_shape_score": 0.00024393547247591934,
-      "v_shape_score": 0.0,
-      "out_of_transit_rms": 0.054125722292612755,
-      "depth_to_rms": 0.07782910075523687,
-      "transit_bottom_width": 0.005734431757395412,
-      "transit_full_width": 0.03526142739203729,
-      "in_transit_points": 0.039404097083742796,
-      "out_of_transit_points": 0.0407908462548778,
-      "folded_point_count": 0.01750659668394843,
-      "binned_transit_min_flux": 0.13069503753256492,
-      "binned_transit_depth": 0.10157864806454699,
+      "transit_symmetry": 0.005693278369089081,
+      "u_shape_score": 0.000472116920419265,
+      "v_shape_score": 0.0039673631656804735,
+      "out_of_transit_rms": 0.04891773129450315,
+      "depth_to_rms": 0.07275220258138354,
+      "transit_bottom_width": 0.00019706374581208798,
+      "transit_full_width": 0.03526142739203728,
+      "in_transit_points": 0.045361936787461914,
+      "out_of_transit_points": 0.03519392564430514,
+      "folded_point_count": 0.03832654659904066,
+      "binned_transit_min_flux": 0.1306950375325649,
+      "binned_transit_depth": 0.09679163807182607,
       "transit_centroid_offset": 0.0
     }
   },
@@ -138,45 +138,45 @@
     "top_random_forest": [
       {
         "feature": "binned_transit_min_flux",
-        "importance": 0.13069503753256492
+        "importance": 0.1306950375325649
       },
       {
         "feature": "binned_transit_depth",
-        "importance": 0.10157864806454699
+        "importance": 0.09679163807182607
       },
       {
         "feature": "even_depth",
-        "importance": 0.08256632022411495
+        "importance": 0.08256632022411493
       },
       {
         "feature": "depth_to_rms",
-        "importance": 0.07782910075523687
+        "importance": 0.07275220258138354
       },
       {
         "feature": "odd_depth",
-        "importance": 0.06181365883670185
+        "importance": 0.06556803851742095
       }
     ],
     "top_xgboost": [
       {
         "feature": "binned_transit_min_flux",
-        "importance": 0.13069503753256492
+        "importance": 0.1306950375325649
       },
       {
         "feature": "binned_transit_depth",
-        "importance": 0.10157864806454699
+        "importance": 0.09679163807182607
       },
       {
         "feature": "even_depth",
-        "importance": 0.08256632022411495
+        "importance": 0.08256632022411493
       },
       {
         "feature": "depth_to_rms",
-        "importance": 0.07782910075523687
+        "importance": 0.07275220258138354
       },
       {
         "feature": "odd_depth",
-        "importance": 0.06181365883670185
+        "importance": 0.06556803851742095
       }
     ]
   }

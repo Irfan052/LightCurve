@@ -60,6 +60,7 @@ def estimate_parameters(
         f"a={semi_major_axis_au:.4f} AU, Confidence={finding_confidence:.2f}"
     )
     
+    from datetime import datetime
     return {
         "period": period_days,
         "epoch": epoch_days,

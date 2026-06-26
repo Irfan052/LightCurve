@@ -42,6 +42,7 @@ def _empty_result(error_message: Optional[str] = None) -> Dict[str, Any]:
     if error_message:
         result["error"] = error_message
         result["metrics"]["error"] = error_message
+    from datetime import datetime
     return result
 
 

@@ -337,8 +337,14 @@ def _expected_feature_count(model: ClassifierModel) -> Optional[int]:
     return getattr(model, "n_features_in_", None)
 
 
+_cached_model: Optional[ClassifierModel] = None
+
 def load_or_train_model() -> ClassifierModel:
     """Load the saved classifier or auto-train when missing or incompatible."""
+    global _cached_model
+    if _cached_model is not None:
+        return _cached_model
+        
     if MODEL_PATH.exists():
         try:
             logger.info("Loading pre-trained classifier model...")
@@ -351,6 +357,7 @@ def load_or_train_model() -> ClassifierModel:
                     len(FEATURE_KEYS),
                 )
             else:
+                _cached_model = model
                 return model
         except Exception as exc:
             logger.warning(f"Failed to load model: {exc}. Retraining...")
@@ -441,6 +448,8 @@ def train_classifier(
         MODEL_PATH,
     )
 
+    global _cached_model
+    _cached_model = best_model
     return best_model
 
 

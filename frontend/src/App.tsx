@@ -14,16 +14,18 @@ import {
 import html2pdf from 'html2pdf.js';
 import './App.css';
 
-import { analyzeTarget, uploadAndAnalyze, type AnalysisResult } from './api';
+import { analyzeTarget, uploadAndAnalyze, generateReport, type AnalysisResult, type CatalogResult } from './api';
 
 function App() {
   const [targetId, setTargetId] = useState('TIC 9991');
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [catalogResult, setCatalogResult] = useState<CatalogResult | null>(null);
+  const [autoAnalyzeProgress, setAutoAnalyzeProgress] = useState<{active: boolean, currentIdx: number, total: number, currentId: string} | null>(null);
+  const [exhaustedStats, setExhaustedStats] = useState<{found: number, checked: number, downloaded: number, skipped: number} | null>(null);
   const [error, setError] = useState('');
   const [runtime, setRuntime] = useState<string>('');
-  const [startTime, setStartTime] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -34,12 +36,13 @@ function App() {
     }
     setTargetId(id);
     setLoading(true);
+    setExhaustedStats(null);
     setError('');
     const start = Date.now();
-    setStartTime(start);
     try {
       const data = await analyzeTarget(id);
       setResult(data);
+      setCatalogResult(null);
       setRuntime(((Date.now() - start) / 1000).toFixed(2));
     } catch (err) {
       setResult(null);
@@ -54,17 +57,84 @@ function App() {
     }
   };
 
+  const handleAnalyzeCatalog = async () => {
+    if (!catalogResult || catalogResult.objects.length === 0) {
+        return;
+    }
+    
+    setExhaustedStats(null);
+    
+    const validObjects = catalogResult.objects.filter(obj => obj.id && !obj.id.toString().startsWith("GAIA"));
+    const hasGaia = catalogResult.objects.some(obj => obj.id && obj.id.toString().startsWith("GAIA"));
+    
+    if (validObjects.length === 0) {
+      if (hasGaia) {
+        setError("This catalog contains Gaia identifiers only. AstroExo currently performs automatic analysis using TIC identifiers because TESS light curves are indexed by TIC. Please upload a TIC catalog or convert Gaia IDs to TIC IDs.");
+      } else {
+        setError("No valid TIC identifiers found in this catalog.");
+      }
+      return;
+    }
+    
+    setAutoAnalyzeProgress({ active: true, currentIdx: 0, total: validObjects.length, currentId: validObjects[0].id.toString() });
+    setLoading(true);
+    setError('');
+    const start = Date.now();
+    
+    let success = false;
+    
+    for (let i = 0; i < validObjects.length; i++) {
+      const targetId = validObjects[i].id.toString();
+      
+      setAutoAnalyzeProgress({ active: true, currentIdx: i, total: validObjects.length, currentId: targetId });
+      setTargetId(targetId);
+      
+      try {
+        const data = await analyzeTarget(targetId);
+        setResult(data);
+        setCatalogResult(null);
+        setRuntime(((Date.now() - start) / 1000).toFixed(2));
+        success = true;
+        break; 
+      } catch (err: any) {
+        if (err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout')) {
+          console.warn(`Target ${targetId} exceeded 90s timeout, skipping...`);
+        } else {
+          console.warn(`Failed to analyze ${targetId}`, err);
+        }
+      }
+    }
+    
+    setAutoAnalyzeProgress(null);
+    setLoading(false);
+    
+    if (!success) {
+      setExhaustedStats({
+        found: catalogResult.objects.length,
+        checked: validObjects.length,
+        downloaded: 0,
+        skipped: catalogResult.objects.length
+      });
+    }
+  };
+
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setLoading(true);
+    setExhaustedStats(null);
     setError('');
     const start = Date.now();
-    setStartTime(start);
     try {
       const data = await uploadAndAnalyze(file);
-      setResult(data);
+      if (data.type === "catalog") {
+        setCatalogResult(data);
+        setResult(null);
+      } else {
+        setResult(data as AnalysisResult);
+        setCatalogResult(null);
+      }
       setRuntime(((Date.now() - start) / 1000).toFixed(2));
     } catch (err) {
       setResult(null);
@@ -81,32 +151,37 @@ function App() {
     }
   };
 
-  const handleExportPDF = () => {
-    if (!reportRef.current) return;
+  const handleExportPDF = async () => {
+    if (!result) return;
     
-    // Add temporary timestamp to report root before snapshot
-    const timestampNode = document.createElement('div');
-    timestampNode.id = 'pdf-timestamp';
-    timestampNode.style.textAlign = 'right';
-    timestampNode.style.color = '#94a3b8';
-    timestampNode.style.fontSize = '0.85rem';
-    timestampNode.style.marginBottom = '1rem';
-    timestampNode.innerText = `Report Generated: ${new Date().toLocaleString()}`;
-    reportRef.current.insertBefore(timestampNode, reportRef.current.firstChild);
-
-    const opt = {
-      margin: 0.5,
-      filename: `astroexo-report-${result?.target_name}.pdf`,
-      image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in' as const, format: 'letter' as const, orientation: 'landscape' as const }
-    };
-    
-    html2pdf().set(opt).from(reportRef.current).save().then(() => {
-      // Remove timestamp after snapshot
-      const node = document.getElementById('pdf-timestamp');
-      if (node && node.parentNode) node.parentNode.removeChild(node);
-    });
+    try {
+      const payload = {
+        target_id: result.target_name,
+        prediction: result.prediction,
+        confidence: result.confidence,
+        period: result.parameters?.period || 0,
+        depth: result.parameters?.transit_depth_percent || 0,
+        duration: result.parameters?.transit_duration_hours || 0,
+        planet_radius: result.parameters?.planet_radius_earth || 0,
+        snr: result.parameters?.snr || 0,
+        probabilities: result.probabilities,
+        features: result.feature_importance_summary?.top_random_forest?.map(f => f.feature) || []
+      };
+      
+      const blob = await generateReport(payload as any);
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `astroexo-report-${result.target_name}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export PDF", err);
+      alert("Failed to export PDF report from backend.");
+    }
   };
 
   useEffect(() => {
@@ -199,7 +274,7 @@ function App() {
               />
             </div>
             <div style={{textAlign: 'center', marginTop: '0.5rem'}}>
-              <a href="data:text/csv;charset=utf-8,time,flux,flux_err%0A1325.2345,1.0001,0.0005%0A1325.2483,0.9998,0.0005%0A1325.2621,0.9850,0.0006%0A" download="sample_lightcurve.csv" style={{fontSize: '0.85rem', color: 'var(--accent-blue)', textDecoration: 'none'}}>Download Sample CSV</a>
+              <a href="/sample_lightcurve.csv" download="sample_lightcurve.csv" style={{fontSize: '0.85rem', color: 'var(--accent-blue)', textDecoration: 'none'}}>Download Sample CSV</a>
             </div>
           </div>
 
@@ -317,16 +392,164 @@ function App() {
           {loading && (
             <div className="loader-container">
               <div className="spinner"></div>
-              <h3>{loadingStatus || "Running Pipeline..."}</h3>
-              <p style={{color: 'var(--text-muted)'}}>Processing light curve, detrending, and applying AI models.</p>
+              <h3>
+                {autoAnalyzeProgress 
+                  ? `Testing Target ${autoAnalyzeProgress.currentIdx + 1} of ${autoAnalyzeProgress.total} (TIC ${autoAnalyzeProgress.currentId})` 
+                  : (loadingStatus || "Running Pipeline...")}
+              </h3>
+              <p style={{color: 'var(--text-muted)'}}>
+                {autoAnalyzeProgress 
+                  ? "Searching MAST archive. Automatically skipping targets without TESS data..." 
+                  : "Processing light curve, detrending, and applying AI models."}
+              </p>
             </div>
           )}
 
-          {!loading && !result && !error && (
+          {!loading && !result && !catalogResult && !error && (
             <div className="empty-state">
               <Activity />
               <h2>No Data Loaded</h2>
               <p>Select a Demo Mode target or upload a CSV to begin analysis.</p>
+            </div>
+          )}
+
+          {!loading && catalogResult && (
+            <div className="catalog-import-view">
+              <div className="classification-banner">
+                <div>
+                  <span style={{color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.85rem', letterSpacing: '1px'}}>Catalog Import</span>
+                  <h2 className="classification-label">Select Target to Analyze</h2>
+                  <p style={{margin: '0.5rem 0 0 0', opacity: 0.8}}>Found {catalogResult.objects.length} objects in uploaded catalog.</p>
+                </div>
+                <div style={{textAlign: 'right'}}>
+                  {!exhaustedStats && (
+                    <button className="btn btn-primary" onClick={handleAnalyzeCatalog}>
+                      <Activity size={18} style={{marginRight: '8px'}} /> Analyze Entire Catalog
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {exhaustedStats && (
+                <div className="card" style={{borderColor: 'var(--accent-orange)', backgroundColor: 'rgba(245, 158, 11, 0.1)', marginTop: '2rem'}}>
+                  <h2 style={{color: 'var(--accent-orange)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0'}}>
+                    <Zap size={24} /> No downloadable TESS light curves were found for any targets in this catalog.
+                  </h2>
+                  <div style={{display: 'flex', gap: '4rem', flexWrap: 'wrap'}}>
+                    <div style={{flex: 1, minWidth: '250px'}}>
+                      <h3 style={{margin: '0 0 0.5rem 0', color: 'var(--text-color)'}}>Analysis Summary</h3>
+                      <ul style={{listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-muted)'}}>
+                        <li><strong>Total targets found:</strong> {exhaustedStats.found}</li>
+                        <li><strong>Targets checked:</strong> {exhaustedStats.checked}</li>
+                        <li><strong>Targets with downloadable TESS data:</strong> {exhaustedStats.downloaded}</li>
+                        <li><strong>Targets skipped (invalid/no data):</strong> {exhaustedStats.skipped}</li>
+                      </ul>
+                    </div>
+                    <div style={{flex: 1, minWidth: '250px'}}>
+                      <h3 style={{margin: '0 0 0.5rem 0', color: 'var(--text-color)'}}>Next Actions</h3>
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                        <button className="btn btn-secondary" style={{justifyContent: 'flex-start', width: '100%'}} onClick={() => fileInputRef.current?.click()}>
+                          <UploadCloud size={16} style={{marginRight: '8px'}} /> Upload another catalog
+                        </button>
+                        <button className="btn btn-secondary" style={{justifyContent: 'flex-start', width: '100%'}} onClick={() => fileInputRef.current?.click()}>
+                          <UploadCloud size={16} style={{marginRight: '8px'}} /> Upload a Light Curve CSV
+                        </button>
+                        <button className="btn btn-secondary" style={{justifyContent: 'flex-start', width: '100%'}} onClick={() => handleAnalyze('9991')}>
+                          <Globe size={16} style={{marginRight: '8px'}} /> Run Demo Analysis
+                        </button>
+                        <a className="btn btn-secondary" style={{justifyContent: 'flex-start', width: '100%', textDecoration: 'none', display: 'flex', alignItems: 'center'}} href="/sample_lightcurve.csv" download="sample_lightcurve.csv">
+                          <Download size={16} style={{marginRight: '8px'}} /> Download the sample dataset
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="card" style={{marginTop: '2rem', overflowX: 'auto'}}>
+                <table className="catalog-table">
+                  <thead>
+                    <tr>
+                      {(() => {
+                        const preferred = ['tic_id', 'tic', 'toi', 'gaia_id', 'gaia', 'source_id', 'object', 'target', 'ra', 'dec', 'magnitude', 'sector'];
+                        const norm = (c: string) => c.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+                        
+                        const preferredMap = preferred.reduce((acc, curr, idx) => { acc[curr] = idx; return acc; }, {} as Record<string, number>);
+                        
+                        // Deduplicate columns just in case
+                        const uniqueCols = Array.from(new Set(catalogResult.columns));
+                        
+                        const orderedCols = uniqueCols
+                          .filter((c: unknown) => {
+                            const n = norm(String(c));
+                            return !n.includes('unnamed') && !n.includes('index') && !n.match(/^column_\d+$/) && !n.match(/^\d+$/);
+                          })
+                          .sort((a: unknown, b: unknown) => {
+                            const na = norm(String(a));
+                            const nb = norm(String(b));
+                            const valA = preferredMap[na] !== undefined ? preferredMap[na] : 999;
+                            const valB = preferredMap[nb] !== undefined ? preferredMap[nb] : 999;
+                            if (valA === valB) return na.localeCompare(nb);
+                            return valA - valB;
+                          });
+                          
+                        return orderedCols.map((col: unknown) => (
+                          <th key={String(col)}>{String(col).toUpperCase()}</th>
+                        ));
+                      })()}
+                      <th>ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catalogResult.objects.map((obj: Record<string, any>, idx: number) => {
+                      const preferred = ['tic_id', 'tic', 'toi', 'gaia_id', 'gaia', 'source_id', 'object', 'target', 'ra', 'dec', 'magnitude', 'sector'];
+                      const norm = (c: string) => c.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+                      const preferredMap = preferred.reduce((acc, curr, i) => { acc[curr] = i; return acc; }, {} as Record<string, number>);
+                      
+                      const uniqueCols = Array.from(new Set(catalogResult.columns));
+                      
+                      const orderedCols = uniqueCols
+                        .filter((c: unknown) => {
+                          const n = norm(String(c));
+                          return !n.includes('unnamed') && !n.includes('index') && !n.match(/^column_\d+$/) && !n.match(/^\d+$/);
+                        })
+                        .sort((a: unknown, b: unknown) => {
+                          const na = norm(String(a));
+                          const nb = norm(String(b));
+                          const valA = preferredMap[na] !== undefined ? preferredMap[na] : 999;
+                          const valB = preferredMap[nb] !== undefined ? preferredMap[nb] : 999;
+                          if (valA === valB) return na.localeCompare(nb);
+                          return valA - valB;
+                        });
+
+                      return (
+                        <tr key={idx}>
+                          {orderedCols.map((col: string) => (
+                            <td key={col}>{obj[col] !== null && obj[col] !== undefined ? obj[col] : 'N/A'}</td>
+                          ))}
+                          <td>
+                            <button className="btn btn-sm btn-primary" onClick={() => {
+                              if (!obj.id) {
+                                alert("No valid identifier found for this row.");
+                                return;
+                              }
+                              
+                              if (obj.id.toString().startsWith("GAIA")) {
+                                alert("This catalog contains Gaia identifiers only. Automatic Gaia→TIC cross-matching is not yet implemented.");
+                                return;
+                              }
+
+                              handleAnalyze(obj.id);
+                            }}>
+                              Analyze
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

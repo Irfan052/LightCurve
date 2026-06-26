@@ -210,8 +210,15 @@ async def upload_and_analyze(file: UploadFile = File(...)):
     temp_dir = Path("data/raw/uploads")
     temp_dir.mkdir(parents=True, exist_ok=True)
     
+    # Verify upload size limits (Max 20MB)
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum upload size is 20MB.")
+    
     # Use UUID to prevent race conditions during concurrent uploads
-    safe_filename = f"{uuid.uuid4().hex}_{file.filename}"
+    safe_filename = f"{uuid.uuid4().hex}_{Path(file.filename).name}"
     temp_file_path = temp_dir / safe_filename
     try:
         # Save file locally
@@ -221,13 +228,17 @@ async def upload_and_analyze(file: UploadFile = File(...)):
         # Parse CSV
         data = load_uploaded_file(str(temp_file_path))
         
+        # If it's a catalog, return immediately
+        if data.get("type") == "catalog":
+            return data
+            
         # Execute pipeline
         result = run_analysis_pipeline(
             time=data["time"],
             flux=data["flux"],
             flux_err=data["flux_err"],
             target_name=data["target_name"],
-            is_mock=data["is_mock"]
+            is_mock=data.get("is_mock", False)
         )
         
         return result
