@@ -1,11 +1,15 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 export interface AnalysisResult {
   type?: "lightcurve";
-  target_name: string;
-  is_mock: boolean;
+  status?: string;
+  message?: string;
+  target?: string;
+  target_name?: string;
+  is_mock?: boolean;
   prediction: string;
   confidence: number;
   probabilities: Record<string, number>;
@@ -15,6 +19,8 @@ export interface AnalysisResult {
     planet_radius_earth?: number;
     period?: number;
     snr?: number;
+    epoch?: number;
+    semi_major_axis_au?: number;
     [key: string]: unknown;
   };
   features: Record<string, number>;
@@ -42,12 +48,28 @@ export interface AnalysisResult {
     bls_periods: number[];
     bls_powers: number[];
   };
+  metadata?: {
+    mission: string;
+    author: string;
+    sector: string;
+    cadence: string;
+    collection: string;
+    observation_id: string;
+    product_type: string;
+    provenance: string;
+    filename: string;
+  };
 }
 
 export interface CatalogResult {
   type: "catalog";
+  catalog_type: "tic_catalog" | "gaia_catalog" | "mixed_catalog";
   columns: string[];
   objects: Record<string, any>[];
+  total_rows?: number;
+  preview_rows?: number;
+  valid_targets?: number;
+  skipped_rows?: number;
 }
 
 export const checkHealth = async () => {
@@ -63,15 +85,10 @@ export const checkHealth = async () => {
 export async function analyzeTarget(
   targetId: string
 ): Promise<AnalysisResult> {
-  try {
-    // 90 second timeout (90000 ms)
-    const response = await axios.post(`${API_BASE_URL}/analyze`, {
-      target_id: targetId,
-    }, { timeout: 90000 });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axios.post(`${API_BASE_URL}/analyze`, {
+    target_id: targetId,
+  }, { timeout: 90000 });
+  return response.data;
 }
 
 export async function uploadAndAnalyze(
