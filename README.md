@@ -1,137 +1,142 @@
-# AstroExo: AI-Powered Exoplanet Detection Platform
+# AstroExo AI Detection Dashboard
 
-AstroExo is a professional-grade scientific platform designed to detect and classify exoplanet transits from TESS (Transiting Exoplanet Survey Satellite) light curves. Developed for the Bharatiya Antariksh Hackathon, AstroExo seamlessly bridges the gap between raw astrophysical data and human-interpretable scientific discovery.
+## 1. Project Overview
+Analyzing raw light curve data to detect exoplanets is a mathematically complex and time-consuming process. Traditional methods require astronomers to manually filter noise, remove stellar variability, and visually inspect phase-folded curves to distinguish true exoplanets from false positives like eclipsing binaries or instrumental artifacts. AstroExo solves this problem by providing a fully automated, AI-driven pipeline that ingests TESS (Transiting Exoplanet Survey Satellite) light-curve observations, processes the signals, and provides an explainable exoplanet classification in seconds.
 
-## 🎯 Problem Statement
+## 2. Features
+* **TIC ID Analysis:** Directly analyze targets using their TESS Input Catalog (TIC) identifiers.
+* **CSV Catalog Upload:** Support for uploading astronomical catalogs and light curves in CSV format.
+* **Automatic Catalog Validation:** Intelligent parsing and validation of uploaded data formats.
+* **Light Curve Preprocessing:** Automated preparation and cleaning of raw light curves.
+* **Quality Filtering:** Advanced filtering utilizing TESS quality flags to reject outliers and anomalies.
+* **Detrending:** Savitzky-Golay filtering to remove stellar variability and instrumental noise.
+* **Transit Detection (BLS):** Box Least Squares (BLS) algorithm to identify periodic transit signatures.
+* **Feature Extraction:** Scientific extraction of morphological and signal-to-noise metrics.
+* **AI-assisted Classification:** Random Forest machine learning model to classify candidates.
+* **Scientific Parameter Estimation:** Calculation of transit depth, duration, and orbital period.
+* **Interactive Visualizations:** Suite of dynamic Plotly charts for deep data exploration.
+* **PDF Report Generation:** Automated creation of publication-ready scientific reports.
+* **Robust Error Handling:** Graceful management of invalid inputs, missing data, and processing failures.
+* **Sample Targets:** Built-in demonstration targets for immediate platform evaluation.
 
-Analyzing raw light curve data to detect exoplanets is a mathematically complex and time-consuming process. Traditional methods require astronomers to manually filter noise, remove stellar variability, and visually inspect phase-folded curves to distinguish true exoplanets from false positives like eclipsing binaries or instrumental artifacts. AstroExo solves this by providing a fully automated, AI-driven pipeline that ingests astronomical catalogs, processes the signals, and provides an explainable classification in seconds.
+## 3. Technology Stack
+* **Frontend:** React, TypeScript, Vite, Plotly
+* **Backend:** Python, FastAPI, Uvicorn
+* **Machine Learning:** Scikit-Learn (Random Forest), XGBoost
+* **Scientific Libraries:** Pandas, NumPy, SciPy
+* **Data Sources:** TESS (Transiting Exoplanet Survey Satellite) observations, MAST (Mikulski Archive for Space Telescopes)
 
-## 🚀 Key Features
+## 4. Project Architecture
+The AstroExo platform utilizes a decoupled architecture where a React-based frontend communicates with a Python FastAPI backend. 
+1. **Frontend:** Provides an interactive UI for users to upload data, input TIC IDs, and visualize results using Plotly charts. It orchestrates the analysis workflow.
+2. **Backend:** Acts as the computational engine. It exposes RESTful endpoints to trigger data retrieval, run the scientific pipeline, and generate PDF reports.
+3. **Machine Learning Pipeline:** Integrated into the backend, it processes extracted light curve features through a pre-trained Random Forest model to determine the likelihood of an exoplanet transit.
+4. **Data Flow:** User Request -> FastAPI -> Data Loader (CSV/MAST) -> Quality Filter -> Detrending -> Transit Search -> Phase Folding -> Feature Engineering -> AI Classifier -> JSON Response -> Frontend Visualization.
 
-* **Intelligent Ingestion:** Supports automated parsing of CSV catalogs and lightcurves. Automatically detects primary identifiers (TIC ID) and presents a clean preview.
-* **Astrophysical Pipeline:** Automatically cleans data, removes stellar variability (Savitzky-Golay detrending), and isolates transit signatures.
-* **Transit Detection & Phase Folding:** Implements a rigorous Box Least Squares (BLS) periodogram to identify periodic transit dips and automatically calculates the transit depth, duration, and orbital period, folding the lightcurve for analysis.
-* **Machine Learning Classification:** Utilizes a trained Random Forest AI model (with XGBoost capabilities) to classify candidates into distinct categories (e.g., Exoplanet Transit, Eclipsing Binary).
-* **Explainable AI (XAI):** A state-of-the-art XAI dashboard explicitly lists the mathematical evidence, feature importance, and risk indicators driving the AI's decision.
-* **Interactive Scientific Visualizations:** Provides a 7-chart Plotly visualization suite covering the entire pipeline: Raw Data, Quality Filtering, Detrending, Transit Detection, BLS Power Spectrum, Phase Folding, and Binned Modeling.
-* **Publication-Ready Reports:** Generates dark-themed, publication-quality PDF reports via the backend (ReportLab), complete with embedded charts, scientific parameters, and XAI summaries.
-* **Robust Error Handling:** Intercepts invalid datasets, flat signals, and incompatible catalogs with user-friendly descriptive dialogs instead of generic backend failures.
-
-## 🏗️ System Architecture
-
-AstroExo features a decoupled architecture, separating high-performance numerical computation from interactive frontend visualization.
-
-```text
-Frontend (React + Vite)
-      │
-      ▼
-FastAPI (REST Interface)
-      │
-      ▼
-Data Ingestion (CSV / File Uploads)
-      │
-      ▼
-Detrending & Quality Filter
-      │
-      ▼
-Transit Detection (BLS) & Phase Folding
-      │
-      ▼
-Feature Extraction (Morphology & SNR)
-      │
-      ▼
-AI Classification (Random Forest / XGBoost)
-      │
-      ▼
-XAI Dashboard & PDF Generation (ReportLab)
-```
-
-## 📂 Project Structure
-
+## 5. Folder Structure
 ```text
 AstroExo/
-├── start.bat / start.sh      # Automated startup scripts
-├── requirements.txt          # Python dependencies
-├── backend/                  # Python FastAPI Backend
-│   ├── app.py                # Main API routing and application entry point
-│   ├── classifier.py         # Random Forest / XGBoost training and classification
-│   ├── config.py             # Global backend configuration
-│   ├── data_loader.py        # CSV parsing and TESS MAST data retrieval
-│   ├── detrend.py            # Savitzky-Golay filtering and variability removal
-│   ├── feature_engineering.py# Scientific feature extraction for ML
-│   ├── parameter_fit.py      # Estimation of physical/orbital parameters
-│   ├── phase_fold.py         # Light curve phase folding and binning
-│   ├── quality_filter.py     # Outlier rejection and signal cleaning
-│   ├── transit_search.py     # Box Least Squares transit detection algorithm
-│   └── utils.py              # Backend utility functions
+├── backend/                  # Python FastAPI Backend and ML Pipeline
+│   ├── app.py                # Main API routing
+│   ├── classifier.py         # AI classification logic
+│   ├── data_loader.py        # Data ingestion from CSV/MAST
+│   ├── detrend.py            # Light curve detrending
+│   ├── feature_engineering.py# Scientific feature extraction
+│   ├── parameter_fit.py      # Scientific parameter estimation
+│   ├── phase_fold.py         # Phase folding logic
+│   ├── quality_filter.py     # Outlier and quality filtering
+│   ├── transit_search.py     # BLS transit detection
+│   └── utils.py              # Utility functions
+├── data/                     # Sample datasets and catalogs
+├── docs/                     # Project documentation
 ├── frontend/                 # React + Vite Frontend
-│   ├── index.html            # Main HTML entry point
+│   ├── public/               # Static assets
+│   ├── src/                  # React components and logic
 │   ├── package.json          # Node dependencies
-│   ├── vite.config.ts        # Vite bundler configuration
-│   └── src/
-│       ├── App.tsx           # Main application dashboard and UI orchestration
-│       ├── api.ts            # Axios API client for backend communication
-│       ├── index.css         # Global styling and AstroExo design system
-│       └── main.tsx          # React DOM mounting
-└── models/                   # Serialized ML Models
-    └── classifier.pkl        # Pre-trained Random Forest model
+│   └── vite.config.ts        # Vite configuration
+├── models/                   # Serialized Machine Learning models
+├── .gitignore                # Git ignore rules
+├── DEMO_SCRIPT.md            # Demo script
+├── README.md                 # Project documentation
+├── TESTING_CHECKLIST.md      # Testing checklists
+├── requirements.txt          # Python dependencies
+├── start.bat                 # Windows startup script
+└── start.sh                  # Linux/macOS startup script
 ```
 
-## 🛠️ Technology Stack
-
-* **Frontend:** React 19, TypeScript, Vite, Plotly.js, Lucide-React
-* **Backend:** Python 3.10+, FastAPI, Uvicorn, Pandas, Numpy, Scipy, Scikit-Learn, XGBoost
-* **Reporting:** ReportLab (Backend PDF Generation)
-
-## 💻 Installation & Quick Start
+## 6. Installation
+The application is designed to be run locally on your machine.
 
 ### Prerequisites
-* Python 3.10 or higher
-* Node.js 18 or higher
+* Python 3.10+
+* Node.js 18+
 
-### One-Click Startup (Recommended)
-You can launch the entire stack (both frontend and backend) using the provided startup scripts:
+### Automated Startup
+To automatically install dependencies and start both frontend and backend servers:
 * **Windows:** Double-click `start.bat` or run it from the command prompt.
-* **macOS/Linux:** Run `./start.sh` from the terminal.
+* **Linux/macOS:** Run `./start.sh` from the terminal.
 
-The script will automatically install dependencies and start both servers.
+### Manual Startup
+If you prefer to start the services manually:
 
-### Manual Setup
-
-**Backend Setup:**
+**1. Backend**
 ```bash
 python -m venv venv
 # Activate the virtual environment:
-# On Windows: venv\Scripts\activate
-# On macOS/Linux: source venv/bin/activate
+# Windows: venv\Scripts\activate
+# Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
-python -m uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn backend.app:app --host 0.0.0.0 --port 8000
 ```
 
-**Frontend Setup:**
+**2. Frontend**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+The dashboard will be available at `http://localhost:5173`.
 
-## 📊 Usage Guide
+## 7. Usage
+* **Analyze a TIC ID:** Enter a valid TESS Input Catalog (TIC) ID in the input field and click "Analyze" to fetch and process data directly from MAST.
+* **Upload a CSV Catalog:** Drag and drop or select a CSV catalog containing light curve data or target lists to initiate automated analysis.
+* **Use Sample Targets:** Utilize the pre-configured sample targets available on the dashboard for quick demonstrations of the pipeline's capabilities.
+* **Export PDF Reports:** After a successful analysis, click the export button to generate and download a comprehensive, publication-ready PDF report detailing the findings.
 
-1. **Launch the Platform:** Open the AstroExo Dashboard at `http://localhost:5173`.
-2. **Select Data Source:** 
-   * **Upload CSV:** Click the upload area to provide an astronomical light curve or catalog. The system will process it or present a preview catalog to select from.
-   * **Sample Targets:** Enter a target ID (e.g., a TIC ID) and click "Analyze", or use the pre-defined target workflows.
-3. **Monitor Processing:** The dashboard cleanly resets and displays a floating status indicator tracking the pipeline stages (Searching MAST, Detrending, Classifying, etc.).
-4. **Review Results:** Once complete, interact with the scientific charts to investigate the light curve morphology and BLS periodogram.
-5. **Explainable AI:** Scroll down to review the AI Decision Summary, Supporting Scientific Evidence, Risk Indicators, and Feature Importance.
-6. **Export Report:** Click the **"Export PDF Report"** button in the header to generate and download a comprehensive, publication-ready summary from the backend.
+## 8. Machine Learning Pipeline
+The analytical core of AstroExo follows a strict sequence:
+1. **Data Loading:** Ingests raw observation data from CSV uploads or MAST queries.
+2. **Quality Filtering:** Applies TESS bitmask filtering and outlier rejection to clean the signal.
+3. **Detrending:** Uses Savitzky-Golay filtering to remove low-frequency stellar variability.
+4. **Transit Search (BLS):** Executes a Box Least Squares periodogram to find periodic dips.
+5. **Phase Folding:** Folds the time-series data based on the discovered period to align transits.
+6. **Feature Engineering:** Extracts critical morphological and physical features (e.g., depth, SNR).
+7. **Random Forest Classification:** Analyzes the extracted features using a trained Random Forest model.
+8. **Scientific Parameter Estimation:** Derives final physical parameters for the potential exoplanet.
 
-## 🔭 Future Enhancements
+## 9. Output
+Upon completion, the dashboard presents:
+* **AI Prediction:** The final classification (e.g., Exoplanet Candidate, Eclipsing Binary).
+* **Confidence Score:** The probability assigned to the prediction by the AI model.
+* **Scientific Parameters:** Calculated values like Transit Period, Depth, and Duration.
+* **Observation Metadata:** Details about the target star and TESS sector observations.
+* **Interactive Charts:** A suite of dynamic Plotly graphs illustrating raw data, detrending, the BLS periodogram, and the phase-folded model.
+* **PDF Report:** A downloadable, formatted document summarizing all evidence and metrics.
 
-* **GPU Acceleration:** Currently, the BLS periodogram operates on the CPU. Future iterations will migrate the search grid to CuPy/JAX for processing long-cadence multi-sector data.
-* **Deep Learning Integration:** While Random Forests provide excellent XAI capabilities, a parallel CNN trained directly on phase-folded fluxes is planned to augment confidence scoring.
-* **Database Persistence:** Currently, analysis results are transient in memory. Future builds will incorporate PostgreSQL for cataloging confirmed candidates.
+## 10. Error Handling
+AstroExo incorporates robust mechanisms to handle failures gracefully:
+* **Invalid TIC IDs:** Alerts the user if the entered ID does not exist or has no recorded observations.
+* **Missing TESS Observations:** Informs the user if light curve data cannot be retrieved for a target.
+* **Invalid Uploads:** Validates CSV structure and notifies the user of formatting or data errors.
+* **Report Generation Restrictions:** Prevents report generation if the analysis fails or data is incomplete, providing clear feedback on the required steps.
 
-## 📄 License
+## 11. Future Improvements
+* Implementation of GPU acceleration for the BLS transit search to analyze long-cadence, multi-sector targets significantly faster.
+* Integration of a deep learning model (e.g., Convolutional Neural Network) operating directly on the folded flux arrays to complement the Random Forest classifier.
+* Expansion of the pipeline to support light curve data from other missions, such as Kepler and K2.
 
+## 12. License
 This project was developed for the Bharatiya Antariksh Hackathon 2026. All rights reserved.
+
+## 13. Author
+AstroExo Team
